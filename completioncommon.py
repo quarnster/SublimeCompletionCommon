@@ -24,15 +24,10 @@ import sublime
 import sublime_plugin
 import re
 import subprocess
-import os.path
 import time
-import os
 import Queue
 import threading
 from parsehelp import parsehelp
-
-
-scriptdir = os.path.dirname(os.path.abspath(__file__))
 
 language_regex = re.compile("(?<=source\.)[\w+#]+")
 member_regex = re.compile("(([a-zA-Z_]+[0-9_]*)|([\)\]])+)(\.)$")
@@ -51,13 +46,14 @@ class CompletionCommonDotComplete(sublime_plugin.TextCommand):
         self.view.run_command("auto_complete")
 
 
-class CompletionCommon:
+class CompletionCommon(object):
 
-    def __init__(self, settingsfile):
+    def __init__(self, settingsfile, workingdir):
         self.settingsfile = settingsfile
         self.completion_proc = None
         self.completion_cmd = None
         self.data_queue = Queue.Queue()
+        self.workingdir = workingdir
 
     def get_settings(self):
         return sublime.load_settings(self.settingsfile)
@@ -101,7 +97,7 @@ class CompletionCommon:
             self.completion_cmd = realcmd
             self.completion_proc = subprocess.Popen(
                 realcmd,
-                cwd=scriptdir,
+                cwd=self.workingdir,
                 shell=True,
                 stdout=subprocess.PIPE,
                 stdin=subprocess.PIPE
