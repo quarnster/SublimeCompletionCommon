@@ -133,6 +133,9 @@ class CompletionCommon(object):
     def is_supported_language(self, view):
         return False
 
+    def get_packages(self, data):
+        return []
+
     def find_absolute_of_type(self, data, full_data, type):
         thispackage = re.search("[ \t]*package (.*);", data)
         if thispackage is None:
@@ -159,22 +162,8 @@ class CompletionCommon(object):
                 return type
             return "%s.%s" % (thispackage, type)
 
-        packages = re.findall("[ \t]*import[ \t]+(.*);", data)
-        packages.append("java.lang.*")
+        packages = self.get_packages(data)
         packages.append(thispackage + ".*")
-        packages.append("")  # for int, boolean, etc
-        for package in packages:
-            if package.endswith(".%s" % type):
-                # Explicit imports, we want these to have the highest
-                # priority when searching for the absolute type, so
-                # insert them at the top of the package list.
-                # Both the .* version and not is added so that
-                # blah.<searchedForClass> and blah$<searchedForClass>
-                # is tested
-                add = package[:-(len(type)+1)]
-                packages.insert(0, add + ".*")
-                packages.insert(1, add)
-                break
         packages.append(";;--;;")
 
         output = self.run_completion("-findclass %s" % (type), "\n".join(packages)).strip()
