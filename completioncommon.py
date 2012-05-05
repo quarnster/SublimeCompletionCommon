@@ -133,7 +133,7 @@ class CompletionCommon(object):
     def is_supported_language(self, view):
         return False
 
-    def get_packages(self, data):
+    def get_packages(self, data, thispackage, type):
         return []
 
     def find_absolute_of_type(self, data, full_data, type):
@@ -162,8 +162,7 @@ class CompletionCommon(object):
                 return type
             return "%s.%s" % (thispackage, type)
 
-        packages = self.get_packages(data)
-        packages.append(thispackage + ".*")
+        packages = self.get_packages(data, thispackage, type)
         packages.append(";;--;;")
 
         output = self.run_completion("-findclass %s" % (type), "\n".join(packages)).strip()
