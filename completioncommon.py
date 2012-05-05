@@ -29,143 +29,16 @@ import time
 import os
 import Queue
 import threading
-try:
-    from parsehelp import parsehelp
-except:
-    def hack(func):
-        # If there's a sublime.error_message before a window is open
-        # on Windows 7, it appears the main editor window
-        # is never opened...
-        class hackClass:
-            def __init__(self, func):
-                self.func = func
-                self.try_now()
+from parsehelp import parsehelp
 
-            def try_now(self):
-                if sublime.active_window() == None:
-                    sublime.set_timeout(self.try_now, 500)
-                else:
-                    self.func()
-        hackClass(func)
-
-    def showError():
-        sublime.error_message("""\
-Unfortunately SublimeJava currently can't be installed \
-via Package Control at the moment. Please see http://www.github.com/quarnster/SublimeJava \
-for more details.""")
-    hack(showError)
 
 scriptdir = os.path.dirname(os.path.abspath(__file__))
-
-
-def get_settings():
-    return sublime.load_settings("SublimeJava.sublime-settings")
-
-
-def get_setting(key, default=None):
-    try:
-        s = sublime.active_window().active_view().settings()
-        if s.has(key):
-            return s.get(key)
-    except:
-        pass
-    return get_settings().get(key, default)
-
-
-java_proc = None
-java_cmd = None
-data_queue = Queue.Queue()
-javaseparator = None  # just so that get_cmd references it. It's set "for real" later
-
-
-def get_cmd():
-    classpath = "."
-    if javaseparator != None:
-        classpath = get_setting("sublimejava_classpath", ["."])
-        classpath.append(".")
-        classpath = javaseparator.join(classpath)
-    return "java -classpath %s SublimeJava" % classpath
-
-
-def java_thread():
-    global java_cmd
-    try:
-        while True:
-            if java_proc.poll() != None:
-                break
-            read = java_proc.stdout.readline().strip()
-            #print "read: %s" % read
-            if read:
-                data_queue.put(read)
-    finally:
-        #print "java_proc: %d" % (java_proc.poll())
-        data_queue.put(";;--;;")
-        data_queue.put(";;--;;exit;;--;;")
-        java_cmd = None
-        print "no longer running"
-
-
-def run_java(cmd, stdin=None):
-    global java_proc
-    global java_cmd
-    realcmd = get_cmd()
-    if not java_proc or realcmd != java_cmd:
-        if java_proc:
-            java_proc.stdin.write("-quit\n")
-            while data_queue.get() != ";;--;;exit;;--;;":
-                continue
-
-        java_cmd = realcmd
-        java_proc = subprocess.Popen(
-            realcmd,
-            cwd=scriptdir,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stdin=subprocess.PIPE
-            )
-        t = threading.Thread(target=java_thread)
-        t.start()
-    #print "wrote: %s" % cmd
-    java_proc.stdin.write(cmd+"\n")
-    if stdin:
-        #print "wrote: %s" % stdin
-        java_proc.stdin.write(stdin + "\n")
-    stdout = ""
-    while True:
-        try:
-            read = data_queue.get(timeout=5.0)
-            if read == ";;--;;" or read == None:
-                break
-            stdout += read+"\n"
-        except:
-            break
-    return stdout
-
-javaseparator = run_java("-separator").strip()
 
 language_regex = re.compile("(?<=source\.)[\w+#]+")
 member_regex = re.compile("(([a-zA-Z_]+[0-9_]*)|([\)\]])+)(\.)$")
 
 
-def get_language(view):
-    caret = view.sel()[0].a
-    scope = view.scope_name(caret).strip()
-    language = language_regex.search(scope)
-    if language == None:
-        if scope.endswith("jsp"):
-            return "jsp"
-        return None
-    return language.group(0)
-
-
-def is_supported_language(view):
-    if view.is_scratch() or not get_setting("sublimejava_enabled", True):
-        return False
-    language = get_language(view)
-    return language == "java" or language == "jsp"
-
-
-class SublimeJavaDotComplete(sublime_plugin.TextCommand):
+class CompletionCommonDotComplete(sublime_plugin.TextCommand):
     def run(self, edit):
         for region in self.view.sel():
             self.view.insert(edit, region.end(), ".")
@@ -178,10 +51,91 @@ class SublimeJavaDotComplete(sublime_plugin.TextCommand):
         self.view.run_command("auto_complete")
 
 
-class SublimeJava(sublime_plugin.EventListener):
+class CompletionCommon:
 
-    def __init__(self):
-        self.cache_list = []
+    def __init__(self, settingsfile):
+        self.settingsfile = settingsfile
+        self.completion_proc = None
+        self.completion_cmd = None
+        self.data_queue = Queue.Queue()
+
+    def get_settings(self):
+        return sublime.load_settings(self.settingsfile)
+
+    def get_setting(self, key, default=None):
+        try:
+            s = sublime.active_window().active_view().settings()
+            if s.has(key):
+                return s.get(key)
+        except:
+            pass
+        return self.get_settings().get(key, default)
+
+    def get_cmd(self):
+        return None
+
+    def completion_thread(self):
+        try:
+            while True:
+                if self.completion_proc.poll() != None:
+                    break
+                read = self.completion_proc.stdout.readline().strip()
+                #print "read: %s" % read
+                if read:
+                    self.data_queue.put(read)
+        finally:
+            #print "completion_proc: %d" % (completion_proc.poll())
+            self.data_queue.put(";;--;;")
+            self.data_queue.put(";;--;;exit;;--;;")
+            self.completion_cmd = None
+            print "no longer running"
+
+    def run_completion(self, cmd, stdin=None):
+        realcmd = self.get_cmd()
+        if not self.completion_proc or realcmd != self.completion_cmd:
+            if self.completion_proc:
+                self.completion_proc.stdin.write("-quit\n")
+                while self.data_queue.get() != ";;--;;exit;;--;;":
+                    continue
+
+            self.completion_cmd = realcmd
+            self.completion_proc = subprocess.Popen(
+                realcmd,
+                cwd=scriptdir,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stdin=subprocess.PIPE
+                )
+            t = threading.Thread(target=self.completion_thread)
+            t.start()
+        #print "wrote: %s" % cmd
+        self.completion_proc.stdin.write(cmd+"\n")
+        if stdin:
+            #print "wrote: %s" % stdin
+            self.completion_proc.stdin.write(stdin + "\n")
+        stdout = ""
+        while True:
+            try:
+                read = self.data_queue.get(timeout=5.0)
+                if read == ";;--;;" or read == None:
+                    break
+                stdout += read+"\n"
+            except:
+                break
+        return stdout
+
+    def get_language(self, view):
+        caret = view.sel()[0].a
+        scope = view.scope_name(caret).strip()
+        language = language_regex.search(scope)
+        if language == None:
+            if scope.endswith("jsp"):
+                return "jsp"
+            return None
+        return language.group(0)
+
+    def is_supported_language(self, view):
+        return False
 
     def find_absolute_of_type(self, data, full_data, type):
         thispackage = re.search("[ \t]*package (.*);", data)
@@ -227,13 +181,13 @@ class SublimeJava(sublime_plugin.EventListener):
                 break
         packages.append(";;--;;")
 
-        output = run_java("-findclass %s" % (type), "\n".join(packages)).strip()
+        output = self.run_completion("-findclass %s" % (type), "\n".join(packages)).strip()
         if len(output) == 0 and "." in type:
             return self.find_absolute_of_type(data, full_data, type.replace(".", "$"))
         return output
 
     def complete_class(self, absolute_classname, prefix):
-        stdout = run_java("-complete %s %s" % (absolute_classname, prefix))
+        stdout = self.run_completion("-complete %s %s" % (absolute_classname, prefix))
         stdout = stdout.split("\n")[:-2]
         members = [tuple(line.split(";;--;;")) for line in stdout]
         ret = []
@@ -243,7 +197,7 @@ class SublimeJava(sublime_plugin.EventListener):
         return sorted(ret, key=lambda a: a[0])
 
     def get_return_type(self, absolute_classname, prefix):
-        stdout = run_java("-returntype %s %s" % (absolute_classname, prefix))
+        stdout = self.run_completion("-returntype %s %s" % (absolute_classname, prefix))
         ret = stdout.strip()
         match = re.search("(\[L)?([^;]+)", ret)
         if match:
@@ -253,7 +207,7 @@ class SublimeJava(sublime_plugin.EventListener):
     def on_query_completions(self, view, prefix, locations):
         bs = time.time()
         start = time.time()
-        if not is_supported_language(view):
+        if not self.is_supported_language(view):
             return []
         line = view.substr(sublime.Region(view.full_line(locations[0]).begin(), locations[0]))
         before = line
@@ -321,11 +275,7 @@ class SublimeJava(sublime_plugin.EventListener):
         return []
 
     def on_query_context(self, view, key, operator, operand, match_all):
-        if key == "sublimejava.dotcomplete":
-            return get_setting(key.replace(".", "_"), True)
-        elif key == "sublimejava.supported_language":
-            return is_supported_language(view)
-        elif key == "sublimejava.is_code":
+        if key == "completion_common.is_code":
             caret = view.sel()[0].a
             scope = view.scope_name(caret).strip()
             return re.search("(string.)|(comment.)", scope) == None
