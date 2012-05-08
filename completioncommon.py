@@ -76,7 +76,6 @@ class CompletionCommon(object):
                 if self.completion_proc.poll() != None:
                     break
                 read = self.completion_proc.stdout.readline().strip()
-                #print "read: %s" % read
                 if read:
                     self.data_queue.put(read)
         finally:
@@ -88,9 +87,10 @@ class CompletionCommon(object):
 
     def run_completion(self, cmd, stdin=None):
         realcmd = self.get_cmd()
-        if not self.completion_proc or realcmd != self.completion_cmd:
+        if not self.completion_proc or realcmd != self.completion_cmd or self.completion_proc.poll() != None:
             if self.completion_proc:
-                self.completion_proc.stdin.write("-quit\n")
+                if self.completion_proc.poll() == None:
+                    self.completion_proc.stdin.write("-quit\n")
                 while self.data_queue.get() != ";;--;;exit;;--;;":
                     continue
 
@@ -104,11 +104,10 @@ class CompletionCommon(object):
                 )
             t = threading.Thread(target=self.completion_thread)
             t.start()
-        #print "wrote: %s" % cmd
-        self.completion_proc.stdin.write(cmd+"\n")
+        towrite = cmd + "\n"
         if stdin:
-            #print "wrote: %s" % stdin
-            self.completion_proc.stdin.write(stdin + "\n")
+            towrite += stdin + "\n"
+        self.completion_proc.stdin.write(towrite)
         stdout = ""
         while True:
             try:
