@@ -169,8 +169,8 @@ class CompletionCommon(object):
             return self.find_absolute_of_type(data, full_data, type.replace(".", "$"))
         return output
 
-    def complete_class(self, absolute_classname, prefix):
-        stdout = self.run_completion("-complete %s %s" % (absolute_classname, prefix))
+    def complete_class(self, absolute_classname, prefix, template_args=""):
+        stdout = self.run_completion("-complete %s %s %s" % (absolute_classname, prefix, template_args))
         stdout = stdout.split("\n")[:-2]
         members = [tuple(line.split(";;--;;")) for line in stdout]
         ret = []
@@ -179,12 +179,21 @@ class CompletionCommon(object):
                 ret.append(member)
         return sorted(ret, key=lambda a: a[0])
 
-    def get_return_type(self, absolute_classname, prefix):
-        stdout = self.run_completion("-returntype %s %s" % (absolute_classname, prefix))
+    def get_return_type(self, absolute_classname, prefix, template_args=""):
+        stdout = self.run_completion("-returntype %s %s %s" % (absolute_classname, prefix, template_args))
         ret = stdout.strip()
         match = re.search("(\[L)?([^;]+)", ret)
         if match:
             return match.group(2)
+        return ret
+
+    def patch_up_template(self, data, full_data, template):
+        if template == None:
+            return None
+        ret = []
+        for param in template:
+            name = self.find_absolute_of_type(data, full_data, param[0])
+            ret.append((name, self.patch_up_template(data, full_data, param[1])))
         return ret
 
     def on_query_completions(self, view, prefix, locations):
@@ -212,8 +221,14 @@ class CompletionCommon(object):
                 # or "String." or other static calls/variables
                 typename = var
             start = time.time()
+            template = parsehelp.solve_template(typename)
+            if template[1]:
+                template = template[1]
+            else:
+                template = ""
             typename = re.sub("(<.*>)|(\[.*\])", "", typename)
             typename = self.find_absolute_of_type(data, full_data, typename)
+            template = self.patch_up_template(data, full_data, template)
             end = time.time()
             print "absolute is %s (%f ms)" % (typename, (end-start)*1000)
             if typename == "":
@@ -236,18 +251,29 @@ class CompletionCommon(object):
                             if count == 0:
                                 idx = tocomplete.find(".", i)
                                 break
+                tempstring = ""
+                if template:
+                    for param in template:
+                        tempstring += parsehelp.make_template(param) + " "
 
-                n = self.get_return_type(typename, sub)
-                print "%s.%s = %s" % (typename, sub, n)
-                typename = n
+                n = self.get_return_type(typename, sub, tempstring)
+                print "%s%s.%s = %s" % (typename, "<%s>" % tempstring if len(tempstring) else "", sub, n)
+                template = parsehelp.solve_template(n)
+                typename = template[0]
+                template = template[1]
                 tocomplete = tocomplete[idx+1:]
                 idx = tocomplete.find(".")
             end = time.time()
             print "finding what to complete took %f ms" % ((end-start) * 1000)
 
-            print "completing %s.%s" % (typename, prefix)
+            template_args = ""
+            if template:
+                for param in template:
+                    template_args += parsehelp.make_template(param) + " "
+
+            print "completing %s%s.%s" % (typename, "<%s>" % template_args if len(template_args) else "", prefix)
             start = time.time()
-            ret = self.complete_class(typename, prefix)
+            ret = self.complete_class(typename, prefix, template_args)
             end = time.time()
             print "completion took %f ms" % ((end-start)*1000)
             be = time.time()
