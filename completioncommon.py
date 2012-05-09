@@ -170,7 +170,7 @@ class CompletionCommon(object):
         return output
 
     def complete_class(self, absolute_classname, prefix, template_args=""):
-        stdout = self.run_completion("-complete %s %s %s" % (absolute_classname, prefix, template_args))
+        stdout = self.run_completion("-complete %s %s %s" % (absolute_classname, ";;--;;" if len(prefix) == 0 else prefix, template_args))
         stdout = stdout.split("\n")[:-2]
         members = [tuple(line.split(";;--;;")) for line in stdout]
         ret = []
