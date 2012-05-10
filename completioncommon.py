@@ -145,7 +145,7 @@ class CompletionCommon(object):
         match = re.search("class %s" % type, full_data)
         if not match is None:
             # This type is defined in this file so figure out the nesting
-            full_data = parsehelp.remove_empty_classes(parsehelp.remove_preprocessing(parsehelp.collapse_brackets(full_data[:match.start()])))
+            full_data = parsehelp.remove_empty_classes(parsehelp.collapse_brackets(parsehelp.remove_preprocessing(full_data[:match.start()])))
             regex = re.compile("\s*class\s+([^\\s{]+)")
             add = ""
             for m in re.finditer(regex, full_data):
@@ -164,13 +164,13 @@ class CompletionCommon(object):
         packages = self.get_packages(data, thispackage, type)
         packages.append(";;--;;")
 
-        output = self.run_completion("-findclass %s" % (type), "\n".join(packages)).strip()
+        output = self.run_completion("-findclass;;--;;%s" % (type), "\n".join(packages)).strip()
         if len(output) == 0 and "." in type:
             return self.find_absolute_of_type(data, full_data, type.replace(".", "$"))
         return output
 
     def complete_class(self, absolute_classname, prefix, template_args=""):
-        stdout = self.run_completion("-complete %s %s %s" % (absolute_classname, ";;--;;" if len(prefix) == 0 else prefix, template_args))
+        stdout = self.run_completion("-complete;;--;;%s;;--;;%s;;--;;%s" % (absolute_classname, prefix, template_args))
         stdout = stdout.split("\n")[:-2]
         members = [tuple(line.split(";;--;;")) for line in stdout]
         ret = []
@@ -180,7 +180,7 @@ class CompletionCommon(object):
         return sorted(ret, key=lambda a: a[0])
 
     def get_return_type(self, absolute_classname, prefix, template_args=""):
-        stdout = self.run_completion("-returntype %s %s %s" % (absolute_classname, prefix, template_args))
+        stdout = self.run_completion("-returntype;;--;;%s;;--;;%s;;--;;%s" % (absolute_classname, prefix, template_args))
         ret = stdout.strip()
         match = re.search("(\[L)?([^;]+)", ret)
         if match:
@@ -209,9 +209,9 @@ class CompletionCommon(object):
             before = ""
         elif re.search("\.$", before):
             # Member completion
-            data = view.substr(sublime.Region(0, locations[0]))
+            data = view.substr(sublime.Region(0, locations[0]-len(prefix)))
             full_data = view.substr(sublime.Region(0, view.size()))
-            typedef = parsehelp.get_type_definition(data, before)
+            typedef = parsehelp.get_type_definition(data)
             if typedef == None:
                 return []
             line, column, typename, var, tocomplete = typedef
@@ -254,7 +254,9 @@ class CompletionCommon(object):
                 tempstring = ""
                 if template:
                     for param in template:
-                        tempstring += parsehelp.make_template(param) + " "
+                        if len(tempstring):
+                            tempstring += ";;--;;"
+                        tempstring += parsehelp.make_template(param)
 
                 n = self.get_return_type(typename, sub, tempstring)
                 print "%s%s.%s = %s" % (typename, "<%s>" % tempstring if len(tempstring) else "", sub, n)
@@ -269,7 +271,9 @@ class CompletionCommon(object):
             template_args = ""
             if template:
                 for param in template:
-                    template_args += parsehelp.make_template(param) + " "
+                    if len(template_args):
+                        template_args += ";;--;;"
+                    template_args += parsehelp.make_template(param)
 
             print "completing %s%s.%s" % (typename, "<%s>" % template_args if len(template_args) else "", prefix)
             start = time.time()
