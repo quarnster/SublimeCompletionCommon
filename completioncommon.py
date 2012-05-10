@@ -260,6 +260,8 @@ class CompletionCommon(object):
 
                 n = self.get_return_type(typename, sub, tempstring)
                 print "%s%s.%s = %s" % (typename, "<%s>" % tempstring if len(tempstring) else "", sub, n)
+                if len(n) == 0:
+                    return []
                 template = parsehelp.solve_template(n)
                 typename = template[0]
                 template = template[1]
