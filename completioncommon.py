@@ -196,6 +196,11 @@ class CompletionCommon(object):
             ret.append((name, self.patch_up_template(data, full_data, param[1])))
         return ret
 
+    def return_completions(self, comp):
+        if self.get_setting("completioncommon_inhibit_sublime_completions", True):
+            return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+        return comp
+
     def on_query_completions(self, view, prefix, locations):
         bs = time.time()
         start = time.time()
@@ -213,7 +218,7 @@ class CompletionCommon(object):
             full_data = view.substr(sublime.Region(0, view.size()))
             typedef = parsehelp.get_type_definition(data)
             if typedef == None:
-                return []
+                return self.return_completions([])
             line, column, typename, var, tocomplete = typedef
 
             if typename is None:
@@ -239,7 +244,7 @@ class CompletionCommon(object):
             end = time.time()
             print "absolute is %s (%f ms)" % (typename, (end-start)*1000)
             if typename == "":
-                return []
+                return self.return_completions([])
 
             tocomplete = tocomplete[1:]  # skip initial .
             start = time.time()
@@ -268,7 +273,7 @@ class CompletionCommon(object):
                 n = self.get_return_type(typename, sub, tempstring)
                 print "%s%s.%s = %s" % (typename, "<%s>" % tempstring if len(tempstring) else "", sub, n)
                 if len(n) == 0:
-                    return []
+                    return self.return_completions([])
                 template = parsehelp.solve_template(n)
                 typename = template[0]
                 template = template[1]
@@ -291,9 +296,7 @@ class CompletionCommon(object):
             print "completion took %f ms" % ((end-start)*1000)
             be = time.time()
             print "total %f ms" % ((be-bs)*1000)
-            return ret
-
-        print "here"
+            return self.return_completions(ret)
         return []
 
     def on_query_context(self, view, key, operator, operand, match_all):
