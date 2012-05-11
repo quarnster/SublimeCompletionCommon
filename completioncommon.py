@@ -232,8 +232,9 @@ class CompletionCommon(object):
             if typename == "":
                 # Possibly a member of the current class
                 clazz = parsehelp.extract_class(data)
-                typename = self.find_absolute_of_type(data, full_data, clazz)
-                tocomplete = "." + oldtypename + tocomplete
+                if clazz != None:
+                    typename = self.find_absolute_of_type(data, full_data, clazz)
+                    tocomplete = "." + oldtypename + tocomplete
             template = self.patch_up_template(data, full_data, template)
             end = time.time()
             print "absolute is %s (%f ms)" % (typename, (end-start)*1000)
