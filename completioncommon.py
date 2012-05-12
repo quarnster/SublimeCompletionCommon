@@ -298,6 +298,17 @@ class CompletionCommon(object):
             print "completion took %f ms" % ((end-start)*1000)
             be = time.time()
             print "total %f ms" % ((be-bs)*1000)
+            if self.get_setting("completioncommon_shorten_names", True):
+                old = ret
+                ret = []
+                regex = re.compile("([\\w\\.]+\\.)*")
+                for display, insert in old:
+                    olddisplay = display
+                    display = regex.sub("", display)
+                    while olddisplay != display:
+                        olddisplay = display
+                        display = regex.sub("", display)
+                    ret.append((display, insert))
             return self.return_completions(ret)
         return []
 
