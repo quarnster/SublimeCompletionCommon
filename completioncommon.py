@@ -135,7 +135,7 @@ class CompletionCommon(object):
     def get_packages(self, data, thispackage, type):
         return []
 
-    def find_absolute_of_type(self, data, full_data, type):
+    def find_absolute_of_type(self, data, full_data, type, template_args=[]):
         thispackage = re.search("[ \t]*package (.*);", data)
         if thispackage is None:
             thispackage = ""
@@ -166,11 +166,11 @@ class CompletionCommon(object):
 
         output = self.run_completion("-findclass;;--;;%s" % (type), "\n".join(packages)).strip()
         if len(output) == 0 and "." in type:
-            return self.find_absolute_of_type(data, full_data, type.replace(".", "$"))
+            return self.find_absolute_of_type(data, full_data, type.replace(".", "$"), template_args)
         return output
 
     def complete_class(self, absolute_classname, prefix, template_args=""):
-        stdout = self.run_completion("-complete;;--;;%s;;--;;%s;;--;;%s" % (absolute_classname, prefix, template_args))
+        stdout = self.run_completion("-complete;;--;;%s;;--;;%s%s%s" % (absolute_classname, prefix, ";;--;;" if len(template_args) else "", template_args))
         stdout = stdout.split("\n")[:-2]
         members = [tuple(line.split(";;--;;")) for line in stdout]
         ret = []
@@ -180,7 +180,7 @@ class CompletionCommon(object):
         return sorted(ret, key=lambda a: a[0])
 
     def get_return_type(self, absolute_classname, prefix, template_args=""):
-        stdout = self.run_completion("-returntype;;--;;%s;;--;;%s;;--;;%s" % (absolute_classname, prefix, template_args))
+        stdout = self.run_completion("-returntype;;--;;%s;;--;;%s%s%s" % (absolute_classname, prefix, ";;--;;" if len(template_args) else "", template_args))
         ret = stdout.strip()
         match = re.search("(\[L)?([^;]+)", ret)
         if match:
@@ -192,7 +192,7 @@ class CompletionCommon(object):
             return None
         ret = []
         for param in template:
-            name = self.find_absolute_of_type(data, full_data, param[0])
+            name = self.find_absolute_of_type(data, full_data, param[0], param[1])
             ret.append((name, self.patch_up_template(data, full_data, param[1])))
         return ret
 
@@ -231,16 +231,17 @@ class CompletionCommon(object):
                 template = template[1]
             else:
                 template = ""
+            template = self.patch_up_template(data, full_data, template)
             typename = re.sub("(<.*>)|(\[.*\])", "", typename)
             oldtypename = typename
-            typename = self.find_absolute_of_type(data, full_data, typename)
+            typename = self.find_absolute_of_type(data, full_data, typename, template)
             if typename == "":
                 # Possibly a member of the current class
                 clazz = parsehelp.extract_class(data)
                 if clazz != None:
-                    typename = self.find_absolute_of_type(data, full_data, clazz)
+                    typename = self.find_absolute_of_type(data, full_data, clazz, template)
                     tocomplete = "." + oldtypename + tocomplete
-            template = self.patch_up_template(data, full_data, template)
+
             end = time.time()
             print "absolute is %s (%f ms)" % (typename, (end-start)*1000)
             if typename == "":
@@ -274,6 +275,7 @@ class CompletionCommon(object):
                 print "%s%s.%s = %s" % (typename, "<%s>" % tempstring if len(tempstring) else "", sub, n)
                 if len(n) == 0:
                     return self.return_completions([])
+                n = parsehelp.get_base_type(n)
                 template = parsehelp.solve_template(n)
                 typename = template[0]
                 template = template[1]
