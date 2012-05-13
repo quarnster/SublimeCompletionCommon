@@ -120,7 +120,9 @@ class CompletionCommon(object):
                 break
         return stdout
 
-    def get_language(self, view):
+    def get_language(self, view=None):
+        if view == None:
+            view = sublime.active_window().active_view()
         caret = view.sel()[0].a
         scope = view.scope_name(caret).strip()
         language = language_regex.search(scope)
@@ -221,7 +223,15 @@ class CompletionCommon(object):
         if len(indata) > 0 and len(indata[0]) == 2:
             # Filtering info not available
             return indata
-        mypackage = parsehelp.extract_package(data)
+
+        mypackage = None
+        lang = self.get_language()
+        if lang == "java" or lang == "jsp":
+            mypackage = parsehelp.extract_package(data)
+        else:
+            mypackage = parsehelp.extract_namespace(data)
+            if mypackage != None:
+                mypackage = mypackage.replace("::", ".")
         if mypackage == None:
             mypackage = ""
         idx = typename.rfind(".")
