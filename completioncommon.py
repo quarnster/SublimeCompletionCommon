@@ -28,6 +28,7 @@ import time
 import Queue
 import threading
 from parsehelp import parsehelp
+reload(parsehelp)
 
 language_regex = re.compile("(?<=source\.)[\w+#]+")
 member_regex = re.compile("(([a-zA-Z_]+[0-9_]*)|([\)\]])+)(\.)$")
@@ -175,6 +176,8 @@ class CompletionCommon(object):
         members = [tuple(line.split(";;--;;")) for line in stdout]
         ret = []
         for member in members:
+            if len(member) == 3:
+                member = (member[0], member[1], int(member[2]))
             if member not in ret:
                 ret.append(member)
         return sorted(ret, key=lambda a: a[0])
@@ -201,6 +204,45 @@ class CompletionCommon(object):
             return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         return comp
 
+    def is_static(self, mod):
+        return (mod&(1<<0)) != 0
+
+    def is_private(self, mod):
+        return (mod&(1<<1)) != 0
+
+    def is_protected(self, mod):
+        return (mod&(1<<2)) != 0
+
+    def is_public(self, mod):
+        return (mod&(1<<3)) != 0
+
+    def filter(self, typename, var, isstatic, data, indata):
+        ret = []
+        if len(indata) > 0 and len(indata[0]) == 2:
+            # Filtering info not available
+            return indata
+        mypackage = parsehelp.extract_package(data)
+        if mypackage == None:
+            mypackage = ""
+        idx = typename.rfind(".")
+        if idx == -1:
+            idx = 0
+        typepackage = typename[:idx]
+        samepackage = mypackage == typepackage
+
+        for disp, ins, mod in indata:
+            public = self.is_public(mod)
+            static = self.is_static(mod)
+            accessible = public or (samepackage and self.is_protected(mod))
+
+            if var == "this":
+                ret.append((disp, ins))
+            elif isstatic and static and accessible:
+                ret.append((disp, ins))
+            elif not isstatic and accessible:
+                ret.append((disp, ins))
+        return ret
+
     def on_query_completions(self, view, prefix, locations):
         bs = time.time()
         start = time.time()
@@ -220,11 +262,13 @@ class CompletionCommon(object):
             if typedef == None:
                 return self.return_completions([])
             line, column, typename, var, tocomplete = typedef
+            print typedef
 
             if typename is None:
                 # This is for completing for example "System."
                 # or "String." or other static calls/variables
                 typename = var
+                var = None
             start = time.time()
             template = parsehelp.solve_template(typename)
             if template[1]:
@@ -239,6 +283,7 @@ class CompletionCommon(object):
                 # Possibly a member of the current class
                 clazz = parsehelp.extract_class(data)
                 if clazz != None:
+                    var = "this"
                     typename = self.find_absolute_of_type(data, full_data, clazz, template)
                     tocomplete = "." + oldtypename + tocomplete
 
@@ -248,6 +293,15 @@ class CompletionCommon(object):
                 return self.return_completions([])
 
             tocomplete = tocomplete[1:]  # skip initial .
+            if len(tocomplete):
+                # Just to make sure that the var isn't "this"
+                # because in the end it isn't "this" we are
+                # completing, but something else
+                var = None
+
+            isstatic = False
+            if len(tocomplete) == 0 and var == None:
+                isstatic = True
             start = time.time()
             idx = tocomplete.find(".")
             while idx != -1:
@@ -294,6 +348,7 @@ class CompletionCommon(object):
             print "completing %s%s.%s" % (typename, "<%s>" % template_args if len(template_args) else "", prefix)
             start = time.time()
             ret = self.complete_class(typename, prefix, template_args)
+            ret = self.filter(typename, var, isstatic, data, ret)
             end = time.time()
             print "completion took %f ms" % ((end-start)*1000)
             be = time.time()
