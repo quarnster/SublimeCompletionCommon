@@ -144,6 +144,9 @@ class CompletionCommon(object):
             thispackage = ""
         else:
             thispackage = thispackage.group(1)
+        sepchar = "$"
+        if self.get_language() == "cs":
+            sepchar = "+"
 
         match = re.search("class %s" % type, full_data)
         if not match is None:
@@ -153,12 +156,12 @@ class CompletionCommon(object):
             add = ""
             for m in re.finditer(regex, full_data):
                 if len(add):
-                    add = "%s$%s" % (add, m.group(1))
+                    add = "%s%s%s" % (add, sepchar, m.group(1))
                 else:
                     add = m.group(1)
 
             if len(add):
-                type = "%s$%s" % (add, type)
+                type = "%s%s%s" % (add, sepchar, type)
             # Class is defined in this file, return package of the file
             if len(thispackage) == 0:
                 return type
@@ -169,7 +172,7 @@ class CompletionCommon(object):
 
         output = self.run_completion("-findclass;;--;;%s" % (type), "\n".join(packages)).strip()
         if len(output) == 0 and "." in type:
-            return self.find_absolute_of_type(data, full_data, type.replace(".", "$"), template_args)
+            return self.find_absolute_of_type(data, full_data, type.replace(".", sepchar), template_args)
         return output
 
     def complete_class(self, absolute_classname, prefix, template_args=""):
