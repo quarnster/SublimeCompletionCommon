@@ -345,6 +345,8 @@ class CompletionCommon(object):
                 n = parsehelp.get_base_type(n)
                 template = parsehelp.solve_template(n)
                 typename = template[0]
+                if self.get_language() == "cs" and len(template) == 3:
+                    typename += "`%d+%s" % (len(template[1]), parsehelp.make_template(template[2]))
                 template = template[1]
                 tocomplete = tocomplete[idx+1:]
                 idx = tocomplete.find(".")
