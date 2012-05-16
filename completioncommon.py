@@ -248,7 +248,7 @@ class CompletionCommon(object):
         for disp, ins, mod in indata:
             public = self.is_public(mod)
             static = self.is_static(mod)
-            accessible = public or (samepackage and self.is_protected(mod))
+            accessible = public or (samepackage and not self.is_private(mod))
 
             if var == "this":
                 ret.append((disp, ins))
