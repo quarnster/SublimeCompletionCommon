@@ -147,6 +147,8 @@ class CompletionCommon(object):
         sepchar = "$"
         if self.get_language() == "cs":
             sepchar = "+"
+            thispackage = re.findall(r"\s*namespace\s+([\w\.]+)\s*{", parsehelp.remove_preprocessing(data), re.MULTILINE)
+            thispackage = ".".join(thispackage)
 
         match = re.search("class %s" % type, full_data)
         if not match is None:
@@ -177,7 +179,7 @@ class CompletionCommon(object):
 
     def complete_class(self, absolute_classname, prefix, template_args=""):
         stdout = self.run_completion("-complete;;--;;%s;;--;;%s%s%s" % (absolute_classname, prefix, ";;--;;" if len(template_args) else "", template_args))
-        stdout = stdout.split("\n")[:-2]
+        stdout = stdout.split("\n")[:-1]
         members = [tuple(line.split(";;--;;")) for line in stdout]
         ret = []
         for member in members:
