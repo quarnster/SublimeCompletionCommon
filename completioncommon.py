@@ -278,6 +278,8 @@ class CompletionCommon(object):
                 return self.return_completions([])
             line, column, typename, var, tocomplete = typedef
             print typedef
+            # TODO: doesn't understand arrays at the moment
+            tocomplete = tocomplete.replace("[]", "")
 
             if typename is None:
                 # This is for completing for example "System."
