@@ -71,6 +71,15 @@ class CompletionCommon(object):
     def get_cmd(self):
         return None
 
+    def error_thread(self):
+        try:
+            while True:
+                if self.completion_proc.poll() != None:
+                    break
+                print "stderr: %s" % (self.completion_proc.stderr.readline().strip())
+        finally:
+            pass
+
     def completion_thread(self):
         try:
             while True:
@@ -101,9 +110,12 @@ class CompletionCommon(object):
                 cwd=self.workingdir,
                 shell=True,
                 stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 stdin=subprocess.PIPE
                 )
             t = threading.Thread(target=self.completion_thread)
+            t.start()
+            t = threading.Thread(target=self.error_thread)
             t.start()
         towrite = cmd + "\n"
         if stdin:
@@ -341,6 +353,12 @@ class CompletionCommon(object):
                         if len(tempstring):
                             tempstring += ";;--;;"
                         tempstring += parsehelp.make_template(param)
+                if "<" in sub and ">" in sub:
+                    temp = parsehelp.solve_template(sub)
+                    temp2 = self.patch_up_template(data, full_data, temp[1])
+                    temp = (temp[0], temp2)
+                    temp = parsehelp.make_template(temp)
+                    sub = "%s%s" % (temp, sub[sub.rfind(">")+1:])
 
                 n = self.get_return_type(typename, sub, tempstring)
                 print "%s%s.%s = %s" % (typename, "<%s>" % tempstring if len(tempstring) else "", sub, n)
