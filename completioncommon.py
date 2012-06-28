@@ -27,6 +27,8 @@ import subprocess
 import time
 import Queue
 import threading
+import os
+import os.path
 from parsehelp import parsehelp
 reload(parsehelp)
 
@@ -67,6 +69,35 @@ class CompletionCommon(object):
         except:
             pass
         return self.get_settings().get(key, default)
+
+    def expand_path(self, value, window=None):
+        value = value % ({'home': os.getenv('HOME')})
+        if window == None:
+            # Views can apparently be window less, in most instances getting
+            # the active_window will be the right choice (for example when
+            # previewing a file), but the one instance this is incorrect
+            # is during Sublime Text 2 session restore. Apparently it's
+            # possible for views to be windowless then too and since it's
+            # possible that multiple windows are to be restored, the
+            # "wrong" one for this view might be the active one and thus
+            # ${project_path} will not be expanded correctly.
+            #
+            # This will have to remain a known documented issue unless
+            # someone can think of something that should be done plugin
+            # side to fix this.
+            window = sublime.active_window()
+
+        get_existing_files = \
+            lambda m: [ path \
+                for f in window.folders() \
+                for path in [os.path.join(f, m.group('file'))] \
+                if os.path.exists(path) \
+            ]
+        value = re.sub(r'\${project_path:(?P<file>[^}]+)}', lambda m: len(get_existing_files(m)) > 0 and get_existing_files(m)[0] or m.group('file'), value)
+        value = re.sub(r'\${folder:(?P<file>.*)}', lambda m: os.path.dirname(m.group('file')), value)
+        value = value.replace('\\', '/')
+
+        return value
 
     def get_cmd(self):
         return None
