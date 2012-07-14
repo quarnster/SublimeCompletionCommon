@@ -43,6 +43,7 @@ class CompletionCommonDotComplete(sublime_plugin.TextCommand):
         caret = self.view.sel()[0].begin()
         line = self.view.substr(sublime.Region(self.view.word(caret-1).a, caret))
         if member_regex.search(line) != None:
+            self.view.run_command("hide_auto_complete")
             sublime.set_timeout(self.delayed_complete, 1)
 
     def delayed_complete(self):
@@ -57,6 +58,7 @@ class CompletionCommon(object):
         self.completion_cmd = None
         self.data_queue = Queue.Queue()
         self.workingdir = workingdir
+        self.debug = False
 
     def get_settings(self):
         return sublime.load_settings(self.settingsfile)
@@ -108,7 +110,8 @@ class CompletionCommon(object):
             while True:
                 if self.completion_proc.poll() != None:
                     break
-                print "stderr: %s" % (self.completion_proc.stderr.readline().strip())
+                if self.debug:
+                    print "stderr: %s" % (self.completion_proc.stderr.readline().strip())
         finally:
             pass
 
@@ -120,6 +123,8 @@ class CompletionCommon(object):
                 read = self.completion_proc.stdout.readline().strip()
                 if read:
                     self.data_queue.put(read)
+                    if self.debug:
+                        print "stdout: %s" % read
         finally:
             #print "completion_proc: %d" % (completion_proc.poll())
             self.data_queue.put(";;--;;")
@@ -128,6 +133,7 @@ class CompletionCommon(object):
             print "no longer running"
 
     def run_completion(self, cmd, stdin=None):
+        self.debug = self.get_setting("completioncommon_debug", False)
         realcmd = self.get_cmd()
         if not self.completion_proc or realcmd != self.completion_cmd or self.completion_proc.poll() != None:
             if self.completion_proc:
@@ -152,6 +158,9 @@ class CompletionCommon(object):
         towrite = cmd + "\n"
         if stdin:
             towrite += stdin + "\n"
+        if self.debug:
+            for line in towrite.split("\n"):
+                print "stdin: %s" % line
         self.completion_proc.stdin.write(towrite)
         stdout = ""
         while True:
