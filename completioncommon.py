@@ -166,6 +166,11 @@ class CompletionCommon(object):
         while True:
             try:
                 read = self.data_queue.get(timeout=5.0)
+                if read == None:
+                    # We timed out... Try forcing the process to restart
+                    # which might possibly help with out of sync issues
+                    self.completion_cmd = None
+
                 if read == ";;--;;" or read == None:
                     break
                 stdout += read+"\n"
