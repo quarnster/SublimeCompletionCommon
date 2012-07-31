@@ -32,7 +32,7 @@ import os.path
 from parsehelp import parsehelp
 reload(parsehelp)
 
-language_regex = re.compile("(?<=source\.)[\w+#]+")
+language_regex = re.compile("(?<=source\.)[\w+\-#]+")
 member_regex = re.compile("(([a-zA-Z_]+[0-9_]*)|([\)\]])+)(\.)$")
 
 
