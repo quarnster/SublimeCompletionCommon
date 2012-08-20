@@ -110,8 +110,13 @@ class CompletionCommon(object):
             while True:
                 if self.completion_proc.poll() != None:
                     break
+                line = self.completion_proc.stderr.readline()
+                if line:
+                    line = line.strip()
+                else:
+                    line = ""
                 if self.debug:
-                    print "stderr: %s" % (self.completion_proc.stderr.readline().strip())
+                    print "stderr: %s" % (line)
         finally:
             pass
 
