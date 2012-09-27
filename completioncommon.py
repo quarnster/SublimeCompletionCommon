@@ -72,7 +72,7 @@ class CompletionCommon(object):
             pass
         return self.get_settings().get(key, default)
 
-    def expand_path(self, value, window=None):
+    def expand_path(self, value, window=None, checkExists=True):
         if window == None:
             # Views can apparently be window less, in most instances getting
             # the active_window will be the right choice (for example when
@@ -89,10 +89,10 @@ class CompletionCommon(object):
             window = sublime.active_window()
 
         get_existing_files = \
-            lambda m: [ path \
+            lambda m: [path \
                 for f in window.folders() \
                 for path in [os.path.join(f, m.group('file'))] \
-                if os.path.exists(path) \
+                if checkExists and os.path.exists(path) or not checkExists
             ]
         value = re.sub(r'\${project_path:(?P<file>[^}]+)}', lambda m: len(get_existing_files(m)) > 0 and get_existing_files(m)[0] or m.group('file'), value)
         value = re.sub(r'\${env:(?P<variable>[^}]+)}', lambda m: os.getenv(m.group('variable')) if os.getenv(m.group('variable')) else "%s_NOT_SET" % m.group('variable'), value)
