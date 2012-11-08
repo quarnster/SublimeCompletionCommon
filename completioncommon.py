@@ -105,8 +105,21 @@ class CompletionCommon(object):
     def get_cmd(self):
         return None
 
+    def show_error(self, msg):
+        sublime.error_message(msg)
+
+    def __err_func(self):
+        exc = self.__curr_exception
+        sublime.set_timeout(lambda: self.show_error(exc), 0)
+        self.__curr_exception = None
+        self.__error_timer = None
+
     def error_thread(self):
         try:
+            err_re = re.compile(r"^(Error|Exception)(\s+caught)?:\s+")
+            stack_re = re.compile(r".*\(.*\)$")
+            self.__error_timer = None
+            self.__curr_exception = None
             while True:
                 if self.completion_proc.poll() != None:
                     break
@@ -115,6 +128,17 @@ class CompletionCommon(object):
                     line = line.strip()
                 else:
                     line = ""
+                if err_re.search(line):
+                    self.__curr_exception = line
+                if self.__curr_exception:
+                    if stack_re.match(line):
+                        self.__curr_exception += "\n\t" + line
+                        if self.__error_timer:
+                            self.__error_timer.cancel()
+                            self.__error_timer = None
+                    if not self.__error_timer:
+                        self.__error_timer = threading.Timer(0.5, self.__err_func)
+                        self.__error_timer.start()
                 if self.debug:
                     print "stderr: %s" % (line)
         finally:
