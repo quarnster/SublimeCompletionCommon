@@ -237,11 +237,11 @@ class CompletionCommon(object):
             thispackage = re.findall(r"\s*namespace\s+([\w\.]+)\s*{", parsehelp.remove_preprocessing(data), re.MULTILINE)
             thispackage = ".".join(thispackage)
 
-        match = re.search("class %s" % type, full_data)
+        match = re.search(r"class %s(\s|$)" % type, full_data)
         if not match is None:
             # This type is defined in this file so figure out the nesting
             full_data = parsehelp.remove_empty_classes(parsehelp.collapse_brackets(parsehelp.remove_preprocessing(full_data[:match.start()])))
-            regex = re.compile("\s*class\s+([^\\s{]+)")
+            regex = re.compile(r"\s*class\s+([^\\s{]+)(?:\s|$)")
             add = ""
             for m in re.finditer(regex, full_data):
                 if len(add):
