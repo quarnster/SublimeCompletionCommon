@@ -112,13 +112,11 @@ class CompletionCommon(object):
         exc = self.__curr_exception
         sublime.set_timeout(lambda: self.show_error(exc), 0)
         self.__curr_exception = None
-        self.__error_timer = None
 
     def error_thread(self):
         try:
             err_re = re.compile(r"^(Error|Exception)(\s+caught)?:\s+")
             stack_re = re.compile(r".*\(.*\)$")
-            self.__error_timer = None
             self.__curr_exception = None
             while True:
                 if self.completion_proc.poll() != None:
@@ -130,15 +128,11 @@ class CompletionCommon(object):
                     line = ""
                 if err_re.search(line):
                     self.__curr_exception = line
-                if self.__curr_exception:
-                    if stack_re.match(line):
+                elif self.__curr_exception:
+                    if line != ";;--;;":
                         self.__curr_exception += "\n\t" + line
-                        if self.__error_timer:
-                            self.__error_timer.cancel()
-                            self.__error_timer = None
-                    if not self.__error_timer:
-                        self.__error_timer = threading.Timer(0.5, self.__err_func)
-                        self.__error_timer.start()
+                    else:
+                        self.__err_func()
                 if self.debug:
                     print "stderr: %s" % (line)
         finally:
