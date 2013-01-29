@@ -25,12 +25,18 @@ import sublime_plugin
 import re
 import subprocess
 import time
-import Queue
+try:
+    import Queue
+except:
+    import queue as Queue
 import threading
 import os
 import os.path
-from parsehelp import parsehelp
-reload(parsehelp)
+import imp
+import sys
+
+parsehelp = imp.load_source("parsehelp", os.path.join(os.path.dirname(os.path.abspath(__file__)), "parsehelp/parsehelp.py"))
+imp.reload(parsehelp)
 
 language_regex = re.compile("(?<=source\.)[\w+\-#]+")
 member_regex = re.compile("(([a-zA-Z_]+[0-9_]*)|([\)\]])+)(\.)$")
@@ -121,7 +127,7 @@ class CompletionCommon(object):
             while True:
                 if self.completion_proc.poll() != None:
                     break
-                line = self.completion_proc.stderr.readline()
+                line = self.completion_proc.stderr.readline().decode(sys.getdefaultencoding())
                 if line:
                     line = line.strip()
                 else:
@@ -134,7 +140,7 @@ class CompletionCommon(object):
                     else:
                         self.__err_func()
                 if self.debug:
-                    print "stderr: %s" % (line)
+                    print("stderr: %s" % (line))
         finally:
             pass
 
@@ -143,17 +149,17 @@ class CompletionCommon(object):
             while True:
                 if self.completion_proc.poll() != None:
                     break
-                read = self.completion_proc.stdout.readline().strip()
+                read = self.completion_proc.stdout.readline().strip().decode(sys.getdefaultencoding())
                 if read:
                     self.data_queue.put(read)
                     if self.debug:
-                        print "stdout: %s" % read
+                        print("stdout: %s" % read)
         finally:
-            #print "completion_proc: %d" % (completion_proc.poll())
+            #print("completion_proc: %d" % (completion_proc.poll()))
             self.data_queue.put(";;--;;")
             self.data_queue.put(";;--;;exit;;--;;")
             self.completion_cmd = None
-            print "no longer running"
+            print("no longer running")
 
     def run_completion(self, cmd, stdin=None):
         self.debug = self.get_setting("completioncommon_debug", False)
@@ -183,8 +189,8 @@ class CompletionCommon(object):
             towrite += stdin + "\n"
         if self.debug:
             for line in towrite.split("\n"):
-                print "stdin: %s" % line
-        self.completion_proc.stdin.write(towrite)
+                print("stdin: %s" % line)
+        self.completion_proc.stdin.write(towrite.encode(sys.getdefaultencoding()))
         stdout = ""
         while True:
             try:
@@ -358,7 +364,7 @@ class CompletionCommon(object):
             if typedef == None:
                 return self.return_completions([])
             line, column, typename, var, tocomplete = typedef
-            print typedef
+            print(typedef)
             # TODO: doesn't understand arrays at the moment
             tocomplete = tocomplete.replace("[]", "")
 
@@ -386,7 +392,7 @@ class CompletionCommon(object):
                     tocomplete = "." + oldtypename + tocomplete
 
             end = time.time()
-            print "absolute is %s (%f ms)" % (typename, (end-start)*1000)
+            print("absolute is %s (%f ms)" % (typename, (end-start)*1000))
             if typename == "":
                 return self.return_completions([])
 
@@ -430,7 +436,7 @@ class CompletionCommon(object):
                     sub = "%s%s" % (temp, sub[sub.rfind(">")+1:])
 
                 n = self.get_return_type(typename, sub, tempstring)
-                print "%s%s.%s = %s" % (typename, "<%s>" % tempstring if len(tempstring) else "", sub, n)
+                print("%s%s.%s = %s" % (typename, "<%s>" % tempstring if len(tempstring) else "", sub, n))
                 if len(n) == 0:
                     return self.return_completions([])
                 n = parsehelp.get_base_type(n)
@@ -442,7 +448,7 @@ class CompletionCommon(object):
                 tocomplete = tocomplete[idx+1:]
                 idx = tocomplete.find(".")
             end = time.time()
-            print "finding what to complete took %f ms" % ((end-start) * 1000)
+            print("finding what to complete took %f ms" % ((end-start) * 1000))
 
             template_args = ""
             if template:
@@ -451,14 +457,14 @@ class CompletionCommon(object):
                         template_args += ";;--;;"
                     template_args += parsehelp.make_template(param)
 
-            print "completing %s%s.%s" % (typename, "<%s>" % template_args if len(template_args) else "", prefix)
+            print("completing %s%s.%s" % (typename, "<%s>" % template_args if len(template_args) else "", prefix))
             start = time.time()
             ret = self.complete_class(typename, prefix, template_args)
             ret = self.filter(typename, var, isstatic, data, ret)
             end = time.time()
-            print "completion took %f ms" % ((end-start)*1000)
+            print("completion took %f ms" % ((end-start)*1000))
             be = time.time()
-            print "total %f ms" % ((be-bs)*1000)
+            print("total %f ms" % ((be-bs)*1000))
             if self.get_setting("completioncommon_shorten_names", True):
                 old = ret
                 ret = []
