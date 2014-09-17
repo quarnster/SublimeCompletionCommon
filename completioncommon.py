@@ -183,7 +183,8 @@ class CompletionCommon(object):
                 shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                stdin=subprocess.PIPE
+                stdin=subprocess.PIPE,
+                bufsize=0
                 )
             t = threading.Thread(target=self.completion_thread)
             t.start()
